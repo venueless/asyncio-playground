@@ -6,7 +6,7 @@ from . import db
 from sqlalchemy.future import select
 
 app = FastAPI()
-workers = set()
+workers = []
 
 @app.on_event("startup")
 async def startup_event():
@@ -27,11 +27,10 @@ async def startup_event():
             session.add(world)
             await session.commit()
 
-
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, world: str):
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    workers.add(websocket)
+    workers.append(websocket)
     try:
         while True:
             message = orjson.loads(await websocket.receive_text())
@@ -47,4 +46,4 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
 
             asyncio.create_task(handle_message())
     except WebSocketDisconnect:
-        workers.discard(websocket)
+        workers.remove(websocket)

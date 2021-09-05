@@ -3,21 +3,21 @@ from fastapi import FastAPI, WebSocket
 import orjson
 from .world_client import WorldClient
 
-WORLD_URL = 'ws://world_server:8080/ws'
+WORLD_URL = 'ws://world_server:8375/ws'
 
 app = FastAPI()
 world_client = None
 world_config = None
-clients = set()
+clients = []
 
 @app.on_event("startup")
 async def startup_event():
     world_client = WorldClient(WORLD_URL)
     world_client.register_message_callback(handle_message)
-    world_client.connect()
+    await world_client.connect()
 
-# async def handle_message(message):
-#     if(message[0]  == )
+async def handle_message(message):
+    print(message)
 
 @app.websocket("/ws/world/{world}/")
 async def websocket_endpoint(websocket: WebSocket, world: str):
@@ -36,7 +36,7 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
         "user": user,
         "websocket": websocket
     }
-    clients.add(client)
+    clients.append(client)
     try:
         while True:
             message = orjson.loads(await websocket.receive_text())
@@ -45,4 +45,4 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
                 continue
             asyncio.create_task(process_message)
     except WebSocketDisconnect:
-        clients.discard(client)
+        clients.remove(client)

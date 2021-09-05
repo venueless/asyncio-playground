@@ -1,3 +1,4 @@
+import asyncio
 import websockets
 import orjson
 
@@ -6,16 +7,23 @@ class APIError(Exception):
 
 class WorldClient:
     def __init__(self, url):
+        self._websocket = None
         self._url = url
         self._open_requests = {}
         self._next_correlation_id = 1
         self._message_callbacks = []
 
     async def connect(self):
-        self._websocket = await websockets.connect(self._url)
+        while not self._websocket:
+            try:
+                self._websocket = await websockets.connect(self._url)
+                if not self._websocket:
+                    await asyncio.sleep(1)
+            except ConnectionRefusedError:
+                print('World server not responsing, retrying')
         asyncio.create_task(self._receiveMessages())
 
-    def register_message_callback(cb):
+    def register_message_callback(self, cb):
         self._message_callbacks.append(cb)
 
     async def call(self, action, data):
@@ -43,4 +51,5 @@ class WorldClient:
                 else:
                     future.set_exception(APIError(message[2]))
             else:
-                asyncio.create_task(cb(message)) for cb in self._message_callbacks
+                for cb in self._message_callbacks:
+                    asyncio.create_task(cb(message))
