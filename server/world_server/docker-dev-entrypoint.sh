@@ -1,4 +1,4 @@
 #!/bin/bash
 # Start server
 echo "Starting server"
-uvicorn world_server.main:app --reload --port 8080
+uvicorn world_server.main:app --reload --port 8080 --reload-dir world_server
