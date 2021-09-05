@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+orjson
+websockets
+sqlalchemy[asyncio]
+asyncpg
+ulid-py
