@@ -1,21 +1,5 @@
 import os
-from sqlalchemy import Column
-from sqlalchemy import DateTime
-from sqlalchemy import ForeignKey
-from sqlalchemy import func
-from sqlalchemy import JSON
-from sqlalchemy import String
-from sqlalchemy import Text
-from sqlalchemy import Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.future import select
-from sqlalchemy.types import TypeDecorator
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm import sessionmaker
+from tortoise import Tortoise
 import ulid
 import uuid
 
@@ -73,48 +57,19 @@ class RoomEvent(Base):
     type = Column(String, nullable=False)
     content = Column(JSON)
 
-engine = None
-Session = None
 
-async def init_db():
-    global engine
-    global Session
-    engine = create_async_engine(
-        "postgresql+asyncpg://{username}:{password}@{host}/{db}".format(
+async def init():
+    await Tortoise.init(
+        db_url="postgresql+asyncpg://{username}:{password}@{host}/{db}".format(
             username = os.getenv("VENUELESS_DB_USER"),
             password = os.getenv("VENUELESS_DB_PASS"),
             host = os.getenv("VENUELESS_DB_HOST"),
             db = os.getenv("VENUELESS_DB_NAME"),
         ),
-        echo=True,
-        pool_size=20,
-        max_overflow=0,
-        future=True,
+        modules={"models": ["app.models"]}
     )
+    # Generate the schema
+    await Tortoise.generate_schemas()
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
-    Session = sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-        future=True,
-    )
-
-    #     await conn.execute(
-    #         t1.insert(), [{"name": "some name 1"}, {"name": "some name 2"}]
-    #     )
-    #
-    # async with engine.connect() as conn:
-    #
-    #     # select a Result, which will be delivered with buffered
-    #     # results
-    #     result = await conn.execute(select(t1).where(t1.c.name == "some name 1"))
-    #
-    #     print(result.fetchall())
-    #
-    # # for AsyncEngine created in function scope, close and
-    # # clean-up pooled connections
-    # await engine.dispose()
+async def shutdown():
+    await Tortoise.close_connections()

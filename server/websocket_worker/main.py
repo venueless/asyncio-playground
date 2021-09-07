@@ -7,11 +7,11 @@ WORLD_URL = 'ws://world_server:8375/ws'
 
 app = FastAPI()
 world_client = None
-world_config = None
 clients = []
 
 @app.on_event("startup")
 async def startup_event():
+    global world_client
     world_client = WorldClient(WORLD_URL)
     world_client.register_message_callback(handle_message)
     await world_client.connect()
@@ -27,13 +27,18 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
     if auth_message[0] != "authenticate":
         await websocket.close()
         return
-    user = await world_client.call("authenticate_user", auth_message[1])
+    print(auth_message)
+    response = await world_client.call(world, "authenticate_user", auth_message[1])
+    user = response["user"]
     await websocket.send_text(orjson.dumps(["authenticated", {
-        "world.config": world_config, # needs to be filtered for user permissions
+        "world.config": response["world.config"], # needs to be filtered for user permissions
         "user.config": user
     }]))
     client = {
-        "user": user,
+        "user": {
+            "id": user["id"],
+            "profile": user["profile"]
+        },
         "websocket": websocket
     }
     clients.append(client)

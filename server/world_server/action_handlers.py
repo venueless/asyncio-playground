@@ -8,6 +8,10 @@ def action(name, broadcast_name=None):
         return fn
     return inner
 
+@action("authenticate_user")
+async def user_update(world, login_info):
+    return await world.authenticate_user(login_info)
+
 @action("user.update")
 async def user_update():
     pass
