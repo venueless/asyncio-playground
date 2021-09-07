@@ -2,6 +2,7 @@
 import asyncio
 import websockets
 import orjson
+import traceback
 
 class APIError(Exception):
     pass
@@ -22,6 +23,9 @@ class WorldClient:
                 print('World server not responsing, retrying')
                 await asyncio.sleep(1)
         asyncio.create_task(self._receiveMessages())
+
+    async def close(self):
+        await self._websocket.close()
 
     def register_message_callback(self, cb):
         self._message_callbacks.append(cb)
@@ -46,17 +50,17 @@ class WorldClient:
         try:
             while True:
                 message = orjson.loads(await self._websocket.recv())
-                print(message)
                 if message[0] == "success" or message[0] == "error":
                     future = self._open_requests.pop(message[1]) # TODO handle missing id
                     if message[0] == "success":
-                        future.set_result({data: message[2], options: message[3]})
+                        future.set_result((message[2], message[3]))
                     else:
                         future.set_exception(APIError(message[2]))
                 else:
                     for cb in self._message_callbacks:
                         asyncio.create_task(cb(message))
         except:
+            traceback.print_exc()
             # reconnect
             self._websocket = None
             await self.connect()

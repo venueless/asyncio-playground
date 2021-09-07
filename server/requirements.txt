@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 orjson
 websockets
-tortoise-orm[asyncpg]
-python-rapidjson
+asyncpg
 ciso8601
 ulid-py

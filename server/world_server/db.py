@@ -1,75 +1,61 @@
 import os
-from tortoise import Tortoise
+import asyncpg
+import orjson
 import ulid
 import uuid
 
-Base = declarative_base()
-
-class ULID(TypeDecorator):
-    impl = UUID
-    cache_ok = True
-
-    def process_bind_param(self, value):
-        if value is None:
-            return value
-        else:
-            return uuid.UUID(bytes=value.bytes)
-
-    def process_result_value(self, value):
-        if value is None:
-            return value
-        else:
-            return ulid.from_uuid(value)
-
-class World(Base):
-    __tablename__ = "worlds"
-    id = Column(String, primary_key=True)
-    title = Column(String, nullable=False)
-    config = Column(JSON, nullable=False)
-    rooms = relationship("Room")
-    users = relationship("User")
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    world_id = Column(String, ForeignKey("worlds.id"), nullable=False)
-    client_id = Column(String)
-    token_id = Column(String)
-    profile = Column(JSON, nullable=False)
-
-Index('idx_users_world_client_id', User.world_id, User.client_id, unique=True)
-Index('idx_users_world_token_id', User.world_id, User.token_id, unique=True)
-
-class Room(Base):
-    __tablename__ = "rooms"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    world_id = Column(String, ForeignKey("worlds.id"), nullable=False)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    modules = Column(JSON)
-
-class RoomEvent(Base):
-    __tablename__ = "room_events"
-    id = Column(ULID, primary_key=True, default=ulid.new)
-    room_id = Column(UUID, ForeignKey("rooms.id"), nullable=False)
-    sender_id = Column(UUID, ForeignKey("users.id"), nullable=False)
-    timestamp = DateTime(timezone=True)
-    type = Column(String, nullable=False)
-    content = Column(JSON)
+async def _init_connection(con):
+    await con.set_type_codec(
+        'json',
+        encoder=lambda v: orjson.dumps(v).decode(),
+        decoder=orjson.loads,
+        schema='pg_catalog'
+    )
 
 
 async def init():
-    await Tortoise.init(
-        db_url="postgresql+asyncpg://{username}:{password}@{host}/{db}".format(
-            username = os.getenv("VENUELESS_DB_USER"),
-            password = os.getenv("VENUELESS_DB_PASS"),
-            host = os.getenv("VENUELESS_DB_HOST"),
-            db = os.getenv("VENUELESS_DB_NAME"),
-        ),
-        modules={"models": ["app.models"]}
+    global pool
+    pool = await asyncpg.create_pool(
+        host = os.getenv("VENUELESS_DB_HOST"),
+        database = os.getenv("VENUELESS_DB_NAME"),
+        user = os.getenv("VENUELESS_DB_USER"),
+        password = os.getenv("VENUELESS_DB_PASS"),
+        init = _init_connection,
     )
-    # Generate the schema
-    await Tortoise.generate_schemas()
+    async with pool.acquire() as con:
+        await con.execute("""
+            CREATE TABLE IF NOT EXISTS "worlds" (
+                "id" VARCHAR(50) NOT NULL PRIMARY KEY,
+                "title" VARCHAR(300) NOT NULL,
+                "config" JSON NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS "rooms" (
+                "id" UUID NOT NULL PRIMARY KEY,
+                "name" VARCHAR(300) NOT NULL,
+                "description" TEXT NOT NULL,
+                "modules" JSON NOT NULL,
+                "world_id" VARCHAR(50) NOT NULL REFERENCES "worlds" ("id") ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS "users" (
+                "id" UUID NOT NULL PRIMARY KEY,
+                "client_id" VARCHAR(200),
+                "token_id" VARCHAR(200),
+                "profile" JSON NOT NULL,
+                "world_id" VARCHAR(50) NOT NULL REFERENCES "worlds" ("id") ON DELETE CASCADE,
+                CONSTRAINT "uid_users_client_id_world" UNIQUE ("client_id", "world_id"),
+                CONSTRAINT "uid_users_token_id_world" UNIQUE ("token_id", "world_id")
+            );
+            CREATE INDEX IF NOT EXISTS "idx_users_client_id" ON "users" ("client_id");
+            CREATE INDEX IF NOT EXISTS "idx_users_token_id" ON "users" ("token_id");
+        """)
 
 async def shutdown():
     await Tortoise.close_connections()
+
+def json_default(value):
+    if isinstance(value, asyncpg.Record):
+        return dict(value)
+    if isinstance(value, asyncpg.pgproto.pgproto.UUID):
+        # because orjson does not use isinstance and dies on pgproto.UUIDs
+        return uuid.UUID(int=value.int)
+    raise TypeError

@@ -2,8 +2,8 @@ import os, sys
 import asyncio
 import traceback
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from tortoise import Tortoise
 import orjson
+from . import db
 from .action_handlers import action_handlers
 from .world import World
 
@@ -28,23 +28,14 @@ workers = []
 @app.on_event("startup")
 async def startup_event():
     await asyncio.sleep(1)
-    await Tortoise.init(
-        db_url="postgres://{username}:{password}@{host}/{db}".format(
-            username = os.getenv("VENUELESS_DB_USER"),
-            password = os.getenv("VENUELESS_DB_PASS"),
-            host = os.getenv("VENUELESS_DB_HOST"),
-            db = os.getenv("VENUELESS_DB_NAME"),
-        ),
-        modules={"models": ["world_server.models"]}
-    )
-    await Tortoise.generate_schemas()
+    await db.init()
     world = World("load-test")
     await world.load()
     worlds[world.id] = world
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await Tortoise.close_connections()
+    pass
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -62,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     traceback.print_exc()
                     response = ["error", message[2], str(e)]
-                await websocket.send_text(orjson.dumps(response).decode())
+                await websocket.send_text(orjson.dumps(response, default=db.json_default).decode())
 
             asyncio.create_task(handle_message())
     except WebSocketDisconnect:

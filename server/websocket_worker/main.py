@@ -1,7 +1,9 @@
 import asyncio
-from fastapi import FastAPI, WebSocket
+import traceback
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import orjson
 from .world_client import WorldClient
+from .action_handlers import action_handlers
 
 WORLD_URL = 'ws://world_server:8375/ws'
 
@@ -16,6 +18,10 @@ async def startup_event():
     world_client.register_message_callback(handle_message)
     await world_client.connect()
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    await world_client.close()
+
 async def handle_message(message):
     print(message)
 
@@ -27,19 +33,16 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
     if auth_message[0] != "authenticate":
         await websocket.close()
         return
-    print(auth_message)
-    response = await world_client.call(world, "authenticate_user", auth_message[1])
-    user = response["user"]
+    (data, options) = await world_client.call(world, "authenticate_user", auth_message[1])
+    user = data["user"]
     await websocket.send_text(orjson.dumps(["authenticated", {
-        "world.config": response["world.config"], # needs to be filtered for user permissions
+        "world.config": data["world.config"], # needs to be filtered for user permissions
         "user.config": user
-    }]))
+    }]).decode())
     client = {
-        "user": {
-            "id": user["id"],
-            "profile": user["profile"]
-        },
-        "websocket": websocket
+        "user": user,
+        "websocket": websocket,
+        "room": None
     }
     clients.append(client)
     try:
@@ -48,6 +51,15 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
             if message[0] == "ping":
                 await websocket.send_text(orjson.dumps(["pong", message[1]]).decode())
                 continue
-            asyncio.create_task(process_message)
+            async def handle_message():
+                try:
+                    handler = action_handlers[message[0]]
+                    result = await handler(client, message[2], world, world_client, clients)
+                    response = ["success", message[1], result]
+                except Exception as e:
+                    traceback.print_exc()
+                    response = ["error", message[1], str(e)]
+                await websocket.send_text(orjson.dumps(response).decode())
+            asyncio.create_task(handle_message())
     except WebSocketDisconnect:
         clients.remove(client)
