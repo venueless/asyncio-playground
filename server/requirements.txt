@@ -5,3 +5,4 @@ websockets
 asyncpg
 ciso8601
 ulid-py
+gunicorn

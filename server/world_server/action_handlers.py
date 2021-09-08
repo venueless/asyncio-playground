@@ -1,11 +1,14 @@
 import asyncio
+import orjson
+from . import db
+
 action_handlers = {}
 
 async def broadcast(workers, ownWorker, message):
     for worker in workers:
         if worker == ownWorker:
             continue
-        asyncio.create_task(worker.send_text(orjson.dumps(message).decode()))
+        asyncio.create_task(worker.send_text(orjson.dumps(message, default=db.json_default).decode()))
 
 def action(name, broadcast_name=None):
     def inner(fn):
