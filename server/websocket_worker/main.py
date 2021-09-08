@@ -23,7 +23,12 @@ async def shutdown_event():
     await world_client.close()
 
 async def handle_message(message):
-    print(message)
+    if (message[0] == "broadcast_room"):
+        for client in clients:
+            if client["room"] == message[1]:
+                asyncio.create_task(client["websocket"].send_text(orjson.dumps(message[2]).decode()))
+    else:
+        print('UNHANDLED MESSAGE', message)
 
 @app.websocket("/ws/world/{world}/")
 async def websocket_endpoint(websocket: WebSocket, world: str):
@@ -51,7 +56,7 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
             if message[0] == "ping":
                 await websocket.send_text(orjson.dumps(["pong", message[1]]).decode())
                 continue
-            async def handle_message():
+            async def handle_message(message):
                 try:
                     handler = action_handlers[message[0]]
                     result = await handler(client, message[2], world, world_client, clients)
@@ -60,6 +65,6 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
                     traceback.print_exc()
                     response = ["error", message[1], str(e)]
                 await websocket.send_text(orjson.dumps(response).decode())
-            asyncio.create_task(handle_message())
+            asyncio.create_task(handle_message(message))
     except WebSocketDisconnect:
         clients.remove(client)

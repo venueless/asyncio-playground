@@ -44,17 +44,17 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             message = orjson.loads(await websocket.receive_text())
-            async def handle_message():
+            async def handle_message(message):
                 try:
                     world = worlds[message[0]] # TODO handle non-existing world
                     handler = action_handlers[message[1]]
-                    result = await handler(world, message[3])
+                    result = await handler(world, message[3], websocket, workers)
                     response = ["success", message[2], result, {"broadcast_name": getattr(handler, "broadcast_name", None)}]
                 except Exception as e:
                     traceback.print_exc()
                     response = ["error", message[2], str(e)]
                 await websocket.send_text(orjson.dumps(response, default=db.json_default).decode())
 
-            asyncio.create_task(handle_message())
+            asyncio.create_task(handle_message(message))
     except WebSocketDisconnect:
         workers.remove(websocket)

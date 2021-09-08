@@ -1,6 +1,7 @@
 import json # for loading the world config file
 import uuid
 from . import db
+from .room import Room
 
 class World:
     def __init__(self, id):
@@ -20,11 +21,12 @@ class World:
                 WHERE worlds.id = $1
             """, self.id)
             if world:
-                self.rooms = await con.fetch("""
+                rooms = await con.fetch("""
                     SELECT id, name, description, modules
                     FROM rooms
                     WHERE rooms.world_id = $1
                 """, self.id)
+                self.rooms = [Room(room) for room in rooms]
                 self.users = []
             else:
                 print("world does not exist, loading from file")
@@ -45,10 +47,11 @@ class World:
                         INSERT INTO rooms(id, name, description, modules, world_id)
                         VALUES ($1, $2, $3, $4::json, $5)
                     """, room["id"], room["name"], room["description"], room["modules"], world["id"])
-                    self.rooms.append(room)
+                    self.rooms.append(Room(room))
         self.world = world
         self.users_by_id = {user.id: user for user in self.users}
         self.users_by_client_id = {user.client_id: user for user in self.users}
+        self.rooms_by_id = {str(room.id): room for room in self.rooms}
 
 
     async def authenticate_user(self, login_info):

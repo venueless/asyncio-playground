@@ -47,10 +47,15 @@ async def init():
             );
             CREATE INDEX IF NOT EXISTS "idx_users_client_id" ON "users" ("client_id");
             CREATE INDEX IF NOT EXISTS "idx_users_token_id" ON "users" ("token_id");
+            CREATE TABLE IF NOT EXISTS "room_events" (
+                "id" UUID NOT NULL PRIMARY KEY,
+                "room_id" UUID NOT NULL REFERENCES "rooms" ("id") ON DELETE CASCADE,
+                "sender_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+                "timestamp" TIMESTAMPTZ NOT NULL,
+                "type" VARCHAR(64) NOT NULL,
+                "content" JSON NOT NULL
+            );
         """)
-
-async def shutdown():
-    await Tortoise.close_connections()
 
 def json_default(value):
     if isinstance(value, asyncpg.Record):
@@ -58,4 +63,8 @@ def json_default(value):
     if isinstance(value, asyncpg.pgproto.pgproto.UUID):
         # because orjson does not use isinstance and dies on pgproto.UUIDs
         return uuid.UUID(int=value.int)
+    if isinstance(value, ulid.ULID):
+        return str(value)
+    if hasattr(value, "json") and callable(value.json):
+        return value.json()
     raise TypeError
