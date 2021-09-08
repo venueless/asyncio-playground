@@ -44,7 +44,7 @@ async def room_subscribe(world, data, worker, workers):
 async def room_send(world, data, worker, workers):
     room = world.rooms_by_id[data["room_id"]]
     event = await room.create_event(data)
-    await broadcast(workers, worker, ["broadcast_room", room, ["room.event", event]])
+    await broadcast(workers, worker, ["broadcast_room", room.id, ["room.event", event]])
     return event
 
 @action("room.fetch")
