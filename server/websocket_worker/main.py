@@ -9,14 +9,17 @@ WORLD_URL = 'ws://world_server:8375/ws'
 
 app = FastAPI()
 world_client = None
+world_config = None
 clients = []
 
 @app.on_event("startup")
 async def startup_event():
     global world_client
+    global world_config
     world_client = WorldClient(WORLD_URL)
     world_client.register_message_callback(handle_message)
     await world_client.connect()
+    (world_config, options) = await world_client.call("load-test", "get_world_config", None)
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -41,7 +44,7 @@ async def websocket_endpoint(websocket: WebSocket, world: str):
     (data, options) = await world_client.call(world, "authenticate_user", auth_message[1])
     user = data["user"]
     await websocket.send_text(orjson.dumps(["authenticated", {
-        "world.config": data["world.config"], # needs to be filtered for user permissions
+        "world.config": world_config, # needs to be filtered for user permissions
         "user.config": user
     }]).decode())
     client = {

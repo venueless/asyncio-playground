@@ -71,9 +71,5 @@ class World:
             self.users_by_id[str(user["id"])] = user
             self.users_by_client_id[user["client_id"]] = user
         return {
-            "world.config": {
-                "title": self.world["title"],
-                "rooms": self.rooms
-            },
             "user": user
         }

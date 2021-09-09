@@ -1,6 +1,8 @@
 import asyncio
 import orjson
+
 action_handlers = {}
+user_cache = {}
 
 async def broadcast(clients, ownClient, message):
     for client in clients:
@@ -27,10 +29,21 @@ async def user_update(client, update, world, world_client, clients):
 
 @action("user.fetch")
 async def user_fetch(client, data, world, world_client, clients):
-    (payload, options) = await world_client.call(world, "user.fetch", {
-        "ids": data["ids"]
+    # uses a cheap cache, which does NOT update
+    global user_cache
+    cached_users = []
+    ids_to_request = []
+    for id in data["ids"]:
+        if id in user_cache:
+            cached_users.append(user_cache[id])
+        else:
+            ids_to_request.append(id)
+    (world_users, options) = await world_client.call(world, "user.fetch", {
+        "ids": ids_to_request
     })
-    return payload
+    for user in world_users:
+        user_cache[user["id"]] = user
+    return cached_users + world_users
 
 @action("room.subscribe")
 async def room_subscribe(client, data, world, world_client, clients):

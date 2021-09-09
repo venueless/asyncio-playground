@@ -18,6 +18,13 @@ def action(name, broadcast_name=None):
         return fn
     return inner
 
+@action("get_world_config")
+async def get_world_config(world, _, worker, workers):
+    return {
+        "title": world.world["title"],
+        "rooms": world.rooms
+    }
+
 @action("authenticate_user")
 async def user_update(world, login_info, worker, workers):
     return await world.authenticate_user(login_info)
