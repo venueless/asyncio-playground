@@ -18,7 +18,10 @@ class WorldClient:
     async def connect(self):
         while not self._websocket:
             try:
-                self._websocket = await websockets.connect(self._url)
+                self._websocket = await websockets.connect(
+                    uri = self._url,
+                    compression = None
+                )
             except ConnectionRefusedError:
                 print('World server not responsing, retrying')
                 await asyncio.sleep(1)
