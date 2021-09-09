@@ -25,7 +25,7 @@ async def startup_event():
 async def handle_message(message):
     if (message[0] == "broadcast_room"):
         for client in clients:
-            if client["room"] == message[1]:
+            if client.room == message[1]:
                 asyncio.create_task(client.send(text_data=orjson.dumps(message[2]).decode()))
     else:
         print('UNHANDLED MESSAGE', message)
