@@ -15,6 +15,7 @@ from django.core.asgi import get_asgi_application
 import venueless.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_channels.settings')
+django.setup()
 
 application = ProtocolTypeRouter({
     # "http": get_asgi_application(),
