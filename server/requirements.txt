@@ -7,3 +7,5 @@ ciso8601
 ulid-py
 gunicorn
 hypercorn
+channels
+django
