@@ -26,6 +26,16 @@ services:
         depends_on:
             - db
             - world_server
+    django_channels:
+        image: server
+        ports:
+            - "8375:8375"
+        volumes:
+            - ./server:/app
+        entrypoint: ["bash", "/app/django_channels/docker-dev-entrypoint.sh"]
+        depends_on:
+            - db
+            - world_server
     db:
         image: "postgres:13"
         volumes:
