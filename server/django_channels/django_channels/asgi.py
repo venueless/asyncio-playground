@@ -8,6 +8,7 @@ https://docs.djangoproject.com/en/3.2/howto/deployment/asgi/
 """
 
 import os
+import django
 
 from channels.routing import ProtocolTypeRouter
 from channels.routing import ProtocolTypeRouter, URLRouter
